@@ -1,0 +1,7 @@
+build/
+*.o
+*.a
+*.so
+*.elf
+compile_commands.json
+.vscode/
