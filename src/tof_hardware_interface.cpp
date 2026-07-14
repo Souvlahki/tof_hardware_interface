@@ -1,5 +1,5 @@
-#include "my_hardware/tof_hardware_interface.hpp"
-#include "my_hardware/helpers.hpp"
+#include "tof_hardware/tof_hardware_interface.hpp"
+#include "tof_hardware/helpers.hpp"
 
 namespace tof_hardware
 {
