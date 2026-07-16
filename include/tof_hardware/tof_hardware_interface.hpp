@@ -5,20 +5,13 @@
 
 #include "rclcpp/rclcpp.hpp"
 #include <libserial/SerialPort.h>
+#include "tof_serial.hpp"
 
 namespace tof_hardware
 {
 
     class TofHardwareInterface : public hardware_interface::SensorInterface
     {
-        struct Config
-        {
-            uint32_t baud_rate;
-            uint32_t timeout_ms;
-            std::string port;
-            uint32_t sample_rate;
-        };
-
     public:
         hardware_interface::CallbackReturn
         on_activate(const rclcpp_lifecycle::State &previous_state) override;
@@ -33,10 +26,10 @@ namespace tof_hardware
         read(const rclcpp::Time &time, const rclcpp::Duration &period) override;
 
     private:
-        Config cfg_;
-        LibSerial::SerialPort serial_;
+        TofSerialConfig cfg_;
+        TofSerial serial_;
     };
 
 } // namespace tof_hardware
 
-#endif
+#endif // TOF_HARDWARE_INTERFACE_HPP

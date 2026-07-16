@@ -20,7 +20,7 @@ struct TofPacket
 {
     uint8_t sensor_id;
     uint16_t range; // mm
-    uint8_t checksum;
+    uint16_t checksum;
 };
 #pragma pack(pop)
 
@@ -54,19 +54,9 @@ public:
 
     const TofSerialConfig &GetConfig() const { return config_; }
 
-    // Reads and assembles one byte's worth of progress toward a packet.
-    // Meant to be called in a tight loop from a reader thread:
-    //
-    //   TofPacket pkt;
-    //   switch (serial.ReadPacket(pkt)) {
-    //     case TofReadStatus::Packet: ... use pkt ...; break;
-    //     case TofReadStatus::NoPacket: continue; // timeout, nothing to do
-    //     case TofReadStatus::SerialError: ... break out / reconnect ...; break;
-    //     default: ... log and continue ...
-    //   }
-    TofReadStatus ReadPacket(TofPacket &out_packet, unsigned int timeout_ms = 1000);
+    TofReadStatus ReadPacket(TofPacket &out_packet);
 
-    static uint8_t CalculateChecksum(uint8_t sensor_id, uint16_t range);
+    static uint16_t CalculateChecksum(uint8_t sensor_id, uint16_t range);
 
 private:
     static LibSerial::BaudRate BaudRateFromInt(int baud);

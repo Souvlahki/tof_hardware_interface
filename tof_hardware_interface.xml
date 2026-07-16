@@ -1,4 +1,4 @@
-<library path="my_hardware">
+<library path="tof_hardware">
     <class name="tof_hardware/TofHardwareInterface" type="tof_hardware::TofHardwareInterface" base_class_type="hardware_interface::SensorInterface">
         <description>
             hardware interface for a tof range sensor

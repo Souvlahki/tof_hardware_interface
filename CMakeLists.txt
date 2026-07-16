@@ -20,6 +20,8 @@ add_library(
   ${PROJECT_NAME}
   SHARED
   src/tof_hardware_interface.cpp
+  src/tof_serial.cpp
+  src/cobsr.c
 )
 
 target_include_directories(${PROJECT_NAME} PRIVATE

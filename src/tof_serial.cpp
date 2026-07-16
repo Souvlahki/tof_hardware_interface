@@ -2,7 +2,7 @@
 
 #include <cstring>
 #include <stdexcept>
-
+#include <cstdint>
 #include "tof_hardware/cobsr.h"
 
 TofSerial::~TofSerial()
@@ -31,11 +31,35 @@ LibSerial::BaudRate TofSerial::BaudRateFromInt(int baud)
     }
 }
 
-uint8_t TofSerial::CalculateChecksum(uint8_t sensor_id, uint16_t range)
+uint16_t crc16(const uint8_t *data, size_t length)
 {
-    return sensor_id ^
-           (range & 0xFF) ^
-           ((range >> 8) & 0xFF);
+    uint16_t crc = 0xFFFF;
+
+    while (length--)
+    {
+        crc ^= static_cast<uint16_t>(*data++) << 8;
+
+        for (int i = 0; i < 8; i++)
+        {
+            if (crc & 0x8000)
+                crc = (crc << 1) ^ 0x1021;
+            else
+                crc <<= 1;
+        }
+    }
+
+    return crc;
+}
+
+uint16_t TofSerial::CalculateChecksum(uint8_t sensor_id, uint16_t range)
+{
+    uint8_t data[3];
+
+    data[0] = sensor_id;
+    data[1] = range & 0xFF;
+    data[2] = range >> 8;
+
+    return crc16(data, 3);
 }
 
 void TofSerial::Init(const TofSerialConfig &config)
@@ -101,46 +125,54 @@ TofReadStatus TofSerial::ProcessBuffer(TofPacket &out_packet) const
     return TofReadStatus::Packet;
 }
 
-TofReadStatus TofSerial::ReadPacket(TofPacket &out_packet, unsigned int timeout_ms)
+TofReadStatus TofSerial::ReadPacket(TofPacket &out_packet)
 {
-    char byte;
+    while (port_.IsDataAvailable())
+    {
+        char byte;
 
-    try
-    {
-        port_.ReadByte(byte, timeout_ms);
-    }
-    catch (const LibSerial::ReadTimeout &)
-    {
-        return TofReadStatus::NoPacket;
-    }
-    catch (const std::exception &)
-    {
-        return TofReadStatus::SerialError;
-    }
-
-    const uint8_t b = static_cast<uint8_t>(byte);
-
-    if (b == 0)
-    {
-        // Delimiter. An empty buffer here just means back-to-back
-        // delimiters (or startup noise) -- nothing to decode.
-        if (rx_buffer_.empty())
+        try
+        {
+            port_.ReadByte(byte, 0);
+        }
+        catch (const LibSerial::ReadTimeout &)
         {
             return TofReadStatus::NoPacket;
         }
+        catch (const std::exception &)
+        {
+            return TofReadStatus::SerialError;
+        }
 
-        const TofReadStatus status = ProcessBuffer(out_packet);
-        rx_buffer_.clear();
-        return status;
+        const uint8_t b = static_cast<uint8_t>(byte);
+
+        if (b == 0)
+        {
+            // Ignore empty frames caused by consecutive delimiters.
+            if (rx_buffer_.empty())
+            {
+                continue;
+            }
+
+            const TofReadStatus status = ProcessBuffer(out_packet);
+            rx_buffer_.clear();
+
+            if (status == TofReadStatus::Packet)
+            {
+                return status;
+            }
+
+            // CRC error or decode failure. Keep looking for the next packet.
+            continue;
+        }
+
+        rx_buffer_.push_back(b);
+
+        // Protect against losing synchronization.
+        if (rx_buffer_.size() > 64)
+        {
+            rx_buffer_.clear();
+        }
     }
-
-    rx_buffer_.push_back(b);
-
-    // Guard against an infinitely growing buffer if framing sync is lost.
-    if (rx_buffer_.size() > 64)
-    {
-        rx_buffer_.clear();
-    }
-
     return TofReadStatus::NoPacket;
 }

@@ -1,5 +1,4 @@
 #include "tof_hardware/tof_hardware_interface.hpp"
-#include "tof_hardware/helpers.hpp"
 
 namespace tof_hardware
 {
@@ -14,8 +13,6 @@ namespace tof_hardware
 
         cfg_.port = info_.hardware_parameters.at("port");
         cfg_.baud_rate = std::stoi(info_.hardware_parameters.at("baud_rate"));
-        cfg_.timeout_ms = std::stoi(info_.hardware_parameters.at("timeout_ms"));
-        cfg_.sample_rate = std::stoi(info_.hardware_parameters.at("sample_rate"));
 
         return hardware_interface::CallbackReturn::SUCCESS;
     }
@@ -23,19 +20,24 @@ namespace tof_hardware
     hardware_interface::CallbackReturn
     TofHardwareInterface::on_activate(const rclcpp_lifecycle::State &previous_state)
     {
-        serial_.Open(cfg_.port);
-        serial_.SetBaudRate(toLibSerialBaud(cfg_.baud_rate));
-
-        serial_.SetCharacterSize(LibSerial::CharacterSize::CHAR_SIZE_8);
-        serial_.SetParity(LibSerial::Parity::PARITY_NONE);
-        serial_.SetStopBits(LibSerial::StopBits::STOP_BITS_1);
-        serial_.SetFlowControl(LibSerial::FlowControl::FLOW_CONTROL_NONE);
+        (void)previous_state;
+        try
+        {
+            serial_.Init(cfg_);
+        }
+        catch (const std::exception &e)
+        {
+            RCLCPP_ERROR(rclcpp::get_logger("TofHardwareInterface"),
+                         "Failed to open %s @ %d: %s", cfg_.port.c_str(), cfg_.baud_rate, e.what());
+            return hardware_interface::CallbackReturn::ERROR;
+        }
         return hardware_interface::CallbackReturn::SUCCESS;
     }
 
     hardware_interface::CallbackReturn
     TofHardwareInterface::on_deactivate(const rclcpp_lifecycle::State &previous_state)
     {
+        (void)previous_state;
         if (serial_.IsOpen())
             serial_.Close();
 
@@ -45,7 +47,19 @@ namespace tof_hardware
     hardware_interface::return_type
     TofHardwareInterface::read(const rclcpp::Time &time, const rclcpp::Duration &period)
     {
-        // read
+        (void)time;
+        (void)period;
+
+        TofPacket packet;
+        TofReadStatus status;
+
+        while ((status = serial_.ReadPacket(packet)) == TofReadStatus::Packet)
+        {
+
+            set_state("base_tof_sensor_1_joint/range", static_cast<double>(packet.range) / 1000.0);
+        }
+
+        return hardware_interface::return_type::OK;
     }
 }
 
